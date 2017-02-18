@@ -988,7 +988,8 @@ class Pokemon(object):
         self.cp_exact = _calc_cp(
             base_attack, base_defense, base_stamina,
             self.iv_attack, self.iv_defense, self.iv_stamina, self.cp_m)
-        assert max(int(self.cp_exact), 10) == self.cp
+        
+        #assert max(int(self.cp_exact), 10) == self.cp
 
         # Percent of maximum possible CP
         self.cp_percent = self.cp_exact / self.static.max_cp
@@ -1272,7 +1273,7 @@ class Inventory(object):
         # self.applied_items = [x["inventory_item_data"] for x in inventory if "applied_items" in x["inventory_item_data"]]
         self.egg_incubators = [x["inventory_item_data"] for x in inventory if "egg_incubators" in x["inventory_item_data"]]
 
-        self.update_web_inventory()
+        #self.update_web_inventory()
 
     def init_inventory_outfile(self):
         web_inventory = os.path.join(_base_dir, "web", "inventory-%s.json" % self.bot.config.username)

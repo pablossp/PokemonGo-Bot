@@ -61,12 +61,12 @@ class CatchPokemon(BaseTask):
         if 'catchable_pokemons' in self.bot.cell:
             pokemon_to_catch = self.bot.cell['catchable_pokemons']
 
-            if len(pokemon_to_catch) > 0:
-                user_web_catchable = os.path.join(_base_dir, 'web', 'catchable-{}.json'.format(self.bot.config.username))
+            #if len(pokemon_to_catch) > 0:
+                #user_web_catchable = os.path.join(_base_dir, 'web', 'catchable-{}.json'.format(self.bot.config.username))
             for pokemon in pokemon_to_catch:
                 # Update web UI
-                with open(user_web_catchable, 'w') as outfile:
-                    json.dump(pokemon, outfile)
+                #with open(user_web_catchable, 'w') as outfile:
+                #    json.dump(pokemon, outfile)
 
                 self.emit_event(
                     'catchable_pokemon',

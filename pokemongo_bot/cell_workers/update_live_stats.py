@@ -1,4 +1,5 @@
 import ctypes
+import os
 
 from sys import stdout, platform as _platform
 from datetime import datetime, timedelta
@@ -276,6 +277,7 @@ class UpdateLiveStats(BaseTask):
             most_perfect_pokemon = "None"
         next_egg_hatching = metrics.next_hatching_km(0)
         hatched_eggs = metrics.hatched_eggs(0)
+        proxy = os.environ['http_proxy'] if 'http_proxy' in os.environ else 'No Proxy'
 
         # Create stats strings.
         available_stats = {
@@ -304,7 +306,8 @@ class UpdateLiveStats(BaseTask):
             'most_perfect_pokemon': most_perfect_pokemon,
             'location': [self.bot.position[0], self.bot.position[1]],
             'next_egg_hatching': float(next_egg_hatching),
-            'hatched_eggs': hatched_eggs
+            'hatched_eggs': hatched_eggs,
+            'proxy': proxy
         }
 
         return available_stats
@@ -352,7 +355,8 @@ class UpdateLiveStats(BaseTask):
             'most_perfect_pokemon': 'Most perfect pokemon : {}'.format(player_stats['most_perfect_pokemon']),
             'location': 'Location : ({}, {})'.format(*player_stats['location']),
             'next_egg_hatching': 'Next egg hatches in : {:.2f} km'.format(player_stats['next_egg_hatching']),
-            'hatched_eggs': 'Hatched {} eggs.'.format(player_stats['hatched_eggs'])
+            'hatched_eggs': 'Hatched {} eggs.'.format(player_stats['hatched_eggs']),
+            'proxy': os.environ['http_proxy'] if 'http_proxy' in os.environ else 'No Proxy'
         }
 
         def get_stat(stat):

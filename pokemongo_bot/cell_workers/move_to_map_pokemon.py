@@ -301,7 +301,7 @@ class MoveToMapPokemon(BaseTask):
             self.bot.mtmp_disabled_global_warning = False
 
         # Retrieve pokemos
-        self.dump_caught_pokemon()
+        #self.dump_caught_pokemon()
         if self.bot.config.enable_social:
             if self.snip_enabled:
                 self.by_pass_times += 1

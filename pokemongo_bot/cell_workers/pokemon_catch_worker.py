@@ -5,6 +5,11 @@ import os
 import time
 import json
 import sys
+from win32api import *
+from win32gui import *
+import win32con
+import struct
+import time
 
 from random import random, randrange, uniform
 from pokemongo_bot import inventory
@@ -42,6 +47,48 @@ LOGIC_TO_FUNCTION = {
 }
 
 DEBUG_ON = False
+
+class WindowsBalloonTip:
+    def __init__(self, title, msg):
+        message_map = {
+                win32con.WM_DESTROY: self.OnDestroy,
+        }
+        # Register the Window class.
+        wc = WNDCLASS()
+        hinst = wc.hInstance = GetModuleHandle(None)
+        wc.lpszClassName = "PythonTaskbar"
+        wc.lpfnWndProc = message_map # could also specify a wndproc.
+        classAtom = RegisterClass(wc)
+        # Create the Window.
+        style = win32con.WS_OVERLAPPED | win32con.WS_SYSMENU
+        self.hwnd = CreateWindow( classAtom, "Taskbar", style, \
+                0, 0, win32con.CW_USEDEFAULT, win32con.CW_USEDEFAULT, \
+                0, 0, hinst, None)
+        UpdateWindow(self.hwnd)
+        iconPathName = os.path.abspath(os.path.join( sys.path[0], "balloontip.ico" ))
+        icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+        try:
+           hicon = LoadImage(hinst, iconPathName, \
+                    win32con.IMAGE_ICON, 0, 0, icon_flags)
+        except:
+          hicon = LoadIcon(0, win32con.IDI_APPLICATION)
+        flags = NIF_ICON | NIF_MESSAGE | NIF_TIP
+        nid = (self.hwnd, 0, flags, win32con.WM_USER+20, hicon, "tooltip")
+        Shell_NotifyIcon(NIM_ADD, nid)
+        Shell_NotifyIcon(NIM_MODIFY, \
+                         (self.hwnd, 0, NIF_INFO, win32con.WM_USER+20,\
+                          hicon, "Balloon  tooltip",msg,200,title))
+        # self.show_balloon(title, msg)
+        time.sleep(10)
+        DestroyWindow(self.hwnd)
+    def OnDestroy(self, hwnd, msg, wparam, lparam):
+        nid = (self.hwnd, 0)
+        Shell_NotifyIcon(NIM_DELETE, nid)
+        PostQuitMessage(0) # Terminate the app.
+
+def balloon_tip(title, msg):
+    w=WindowsBalloonTip(title, msg)
+
 
 class PokemonCatchWorker(BaseTask):
 
@@ -211,8 +258,12 @@ class PokemonCatchWorker(BaseTask):
                 self._do_catch(pokemon, encounter_id, catch_rate_by_ball, is_vip=is_vip)
                 break
             else:
+                player_stats = inventory.player().player_stats
                 self.emit_event('catch_limit', formatted='WARNING! You have reached your daily catch limit')
-                sys.exit(2)
+                with open('..\\update\\updatedaccs.csv','a') as file:
+                    file.write('Level '+str(int(player_stats.get('level', 0))) + "\t" + self.bot.config.username + "\n")
+                balloon_tip(self.bot.config.username,'Level '+str(int(player_stats.get('level', 0)))+'\nAccount is tired for today, try again tomorrow')
+                sys.quit(5)
                 break
 
         # simulate app
@@ -418,24 +469,24 @@ class PokemonCatchWorker(BaseTask):
                     level='warning',
                     formatted='Failed to use berry. You may be softbanned.'
                 )
-                with self.bot.database as conn:
-                    c = conn.cursor()
-                    c.execute("SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='softban_log'")
-                result = c.fetchone()
+                #with self.bot.database as conn:
+                #    c = conn.cursor()
+                #    c.execute("SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='softban_log'")
+                #result = c.fetchone()
 
-                while True:
-                    if result[0] == 1:
-                        source = str("PokemonCatchWorker")
-                        status = str("Possible Softban")
-                        conn.execute('''INSERT INTO softban_log (status, source) VALUES (?, ?)''', (status, source))
-                    break
-                else:
-                    self.emit_event(
-                        'softban_log',
-                        sender=self,
-                        level='info',
-                        formatted="softban_log table not found, skipping log"
-                    )
+                #while True:
+                #    if result[0] == 1:
+                #        source = str("PokemonCatchWorker")
+                #        status = str("Possible Softban")
+                #        conn.execute('''INSERT INTO softban_log (status, source) VALUES (?, ?)''', (status, source))
+                #    break
+                #else:
+                #    self.emit_event(
+                #        'softban_log',
+                #        sender=self,
+                #        level='info',
+                #        formatted="softban_log table not found, skipping log"
+                #    )
 
         # unknown status code
         else:
@@ -590,23 +641,23 @@ class PokemonCatchWorker(BaseTask):
             # abandon if pokemon vanished
             elif catch_pokemon_status == CATCH_STATUS_VANISHED:
                 #insert into DB
-                with self.bot.database as conn:
-                    c = conn.cursor()
-                    c.execute("SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='vanish_log'")
-                result = c.fetchone()
+                #with self.bot.database as conn:
+                #    c = conn.cursor()
+                #    c.execute("SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='vanish_log'")
+                #result = c.fetchone()
 
-                while True:
-                    if result[0] == 1:
-                        conn.execute('''INSERT INTO vanish_log (pokemon, cp, iv, encounter_id, pokemon_id) VALUES (?, ?, ?, ?, ?)''', (pokemon.name, pokemon.cp, pokemon.iv, str(encounter_id), pokemon.pokemon_id))
-                    break
-                else:
-                    self.emit_event(
-                        'vanish_log',
-                        sender=self,
-                        level='info',
-                        formatted="vanish_log table not found, skipping log"
-                    )
-                    break
+                #while True:
+                #    if result[0] == 1:
+                #        conn.execute('''INSERT INTO vanish_log (pokemon, cp, iv, encounter_id, pokemon_id) VALUES (?, ?, ?, ?, ?)''', (pokemon.name, pokemon.cp, pokemon.iv, str(encounter_id), pokemon.pokemon_id))
+                #    break
+                #else:
+                #    self.emit_event(
+                #        'vanish_log',
+                #        sender=self,
+                #        level='info',
+                #        formatted="vanish_log table not found, skipping log"
+                #    )
+                #    break
 
                 self.emit_event(
                     'pokemon_vanished',
@@ -620,18 +671,18 @@ class PokemonCatchWorker(BaseTask):
                     }
                 )
 
-                with self.bot.database as conn:
-                    c = conn.cursor()
-                    c.execute("SELECT DISTINCT COUNT(encounter_id) FROM vanish_log WHERE dated > (SELECT dated FROM catch_log WHERE dated IN (SELECT MAX(dated) FROM catch_log))")
+                #with self.bot.database as conn:
+                #    c = conn.cursor()
+                #    c.execute("SELECT DISTINCT COUNT(encounter_id) FROM vanish_log WHERE dated > (SELECT dated FROM catch_log WHERE dated IN (SELECT MAX(dated) FROM catch_log))")
 
-                result = c.fetchone()
-                self.consecutive_vanishes_so_far = result[0]
+                #result = c.fetchone()
+                #self.consecutive_vanishes_so_far = result[0]
 
-                if self.rest_completed == False and self.consecutive_vanishes_so_far >= self.consecutive_vanish_limit:
-                    self.start_rest()
+                #if self.rest_completed == False and self.consecutive_vanishes_so_far >= self.consecutive_vanish_limit:
+                #    self.start_rest()
 
-                if self._pct(catch_rate_by_ball[current_ball]) == 100:
-                    self.bot.softban = True
+                #if self._pct(catch_rate_by_ball[current_ball]) == 100:
+                #    self.bot.softban = True
 
             # pokemon caught!
             elif catch_pokemon_status == CATCH_STATUS_SUCCESS:
@@ -649,25 +700,47 @@ class PokemonCatchWorker(BaseTask):
 
                 result = c.fetchone()
 
-                self.emit_event(
-                    'pokemon_caught',
-                    formatted='Captured {pokemon}! (CP: {cp} IV: {iv} {iv_display} NCP: {ncp}) Catch Limit: ({caught_last_24_hour}/{daily_catch_limit}) +{exp} exp +{stardust} stardust',
-                    data={
-                        'pokemon': pokemon.name,
-                        'ncp': str(round(pokemon.cp_percent, 2)),
-                        'cp': str(int(pokemon.cp)),
-                        'iv': str(pokemon.iv),
-                        'iv_display': str(pokemon.iv_display),
-                        'exp': str(exp_gain),
-                        'stardust': stardust_gain,
-                        'encounter_id': str(self.pokemon['encounter_id']),
-                        'latitude': str(self.pokemon['latitude']),
-                        'longitude': str(self.pokemon['longitude']),
-                        'pokemon_id': str(pokemon.pokemon_id),
-                        'caught_last_24_hour': str(result[0]),
-                        'daily_catch_limit': str(self.daily_catch_limit)
-                    }
-                )
+                if is_vip:
+                    self.emit_event(
+                        'pokemon_vip_caught',
+                        formatted='Vip Captured {pokemon}! (CP: {cp} IV: {iv} {iv_display} NCP: {ncp}) Catch Limit: ({caught_last_24_hour}/{daily_catch_limit}) +{exp} exp +{stardust} stardust',
+                        data={
+                            'pokemon': pokemon.name,
+                            'ncp': str(round(pokemon.cp_percent, 2)),
+                            'cp': str(int(pokemon.cp)),
+                            'iv': str(pokemon.iv),
+                            'iv_display': str(pokemon.iv_display),
+                            'exp': str(exp_gain),
+                            'stardust': stardust_gain,
+                            'encounter_id': str(self.pokemon['encounter_id']),
+                            'latitude': str(self.pokemon['latitude']),
+                            'longitude': str(self.pokemon['longitude']),
+                            'pokemon_id': str(pokemon.pokemon_id),
+                            'caught_last_24_hour': str(result[0]),
+                            'daily_catch_limit': str(self.daily_catch_limit)
+                        }
+                    )
+
+                else:
+                    self.emit_event(
+                        'pokemon_caught',
+                        formatted='Captured {pokemon}! (CP: {cp} IV: {iv} {iv_display} NCP: {ncp}) Catch Limit: ({caught_last_24_hour}/{daily_catch_limit}) +{exp} exp +{stardust} stardust',
+                        data={
+                            'pokemon': pokemon.name,
+                            'ncp': str(round(pokemon.cp_percent, 2)),
+                            'cp': str(int(pokemon.cp)),
+                            'iv': str(pokemon.iv),
+                            'iv_display': str(pokemon.iv_display),
+                            'exp': str(exp_gain),
+                            'stardust': stardust_gain,
+                            'encounter_id': str(self.pokemon['encounter_id']),
+                            'latitude': str(self.pokemon['latitude']),
+                            'longitude': str(self.pokemon['longitude']),
+                            'pokemon_id': str(pokemon.pokemon_id),
+                            'caught_last_24_hour': str(result[0]),
+                            'daily_catch_limit': str(self.daily_catch_limit)
+                        }
+                    )
 
 
                 inventory.pokemons().add(pokemon)
@@ -688,42 +761,42 @@ class PokemonCatchWorker(BaseTask):
                 self.bot.softban = False
 
 
-                try:
-                    with self.bot.database as conn:
-                        c = conn.cursor()
-                        c.execute("SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='catch_log'")
-                    result = c.fetchone()
+                #try:
+                #    with self.bot.database as conn:
+                #        c = conn.cursor()
+                #        c.execute("SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='catch_log'")
+                #    result = c.fetchone()
 
-                    while True:
-                        if result[0] == 1:
-                            conn.execute('''INSERT INTO catch_log (pokemon, cp, iv, encounter_id, pokemon_id) VALUES (?, ?, ?, ?, ?)''', (pokemon.name, pokemon.cp, pokemon.iv, str(encounter_id), pokemon.pokemon_id))
-                        break
-                    else:
-                        self.emit_event(
-                            'catch_log',
-                            sender=self,
-                            level='info',
-                            formatted="catch_log table not found, skipping log"
-                        )
-                        break
-                    user_data_caught = os.path.join(_base_dir, 'data', 'caught-%s.json' % self.bot.config.username)
-                    with open(user_data_caught, 'ab') as outfile:
-                        outfile.write(str(datetime.now()))
-                        json.dump({
-                            'pokemon': pokemon.name,
-                            'cp': pokemon.cp,
-                            'iv': pokemon.iv,
-                            'encounter_id': self.pokemon['encounter_id'],
-                            'pokemon_id': pokemon.pokemon_id
-                        }, outfile)
-                        outfile.write('\n')
+                #    while True:
+                #        if result[0] == 1:
+                #            conn.execute('''INSERT INTO catch_log (pokemon, cp, iv, encounter_id, pokemon_id) VALUES (?, ?, ?, ?, ?)''', (pokemon.name, pokemon.cp, pokemon.iv, str(encounter_id), pokemon.pokemon_id))
+                #        break
+                #    else:
+                #        self.emit_event(
+                #            'catch_log',
+                #            sender=self,
+                #            level='info',
+                #            formatted="catch_log table not found, skipping log"
+                #        )
+                #        break
+                    #user_data_caught = os.path.join(_base_dir, 'data', 'caught-%s.json' % self.bot.config.username)
+                    #with open(user_data_caught, 'ab') as outfile:
+                    #    outfile.write(str(datetime.now()))
+                    #    json.dump({
+                    #        'pokemon': pokemon.name,
+                    #        'cp': pokemon.cp,
+                    #        'iv': pokemon.iv,
+                    #        'encounter_id': self.pokemon['encounter_id'],
+                    #        'pokemon_id': pokemon.pokemon_id
+                    #    }, outfile)
+                    #    outfile.write('\n')
 
                     # if it is a new pokemon to our dex, simulate app animation delay
-                    if exp_gain >= 500:
-                        sleep (randrange(self.catchsim_newtodex_wait_min, self.catchsim_newtodex_wait_max))
+                #    if exp_gain >= 500:
+                #        sleep (randrange(self.catchsim_newtodex_wait_min, self.catchsim_newtodex_wait_max))
 
-                except IOError as e:
-                    self.logger.info('[x] Error while opening location file: %s' % e)
+                #except IOError as e:
+                #    self.logger.info('[x] Error while opening location file: %s' % e)
 
             elif catch_pokemon_status == CATCH_STATUS_MISSED:
                 self.emit_event(

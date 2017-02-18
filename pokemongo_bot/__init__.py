@@ -33,6 +33,7 @@ from .sleep_schedule import SleepSchedule
 from pokemongo_bot.event_handlers import SocketIoHandler, LoggingHandler, SocialHandler
 from pokemongo_bot.socketio_server.runner import SocketIoRunner
 from pokemongo_bot.websocket_remote_control import WebsocketRemoteControl
+from pokemongo_bot.event_handlers import SocketIoHandler, LoggingHandler, SocialHandler, CaptchaHandler
 from pokemongo_bot.base_dir import _base_dir
 from .worker_result import WorkerResult
 from .tree_config_builder import ConfigException
@@ -162,20 +163,21 @@ class PokemonGoBot(object):
 
         handlers.append(LoggingHandler(color, debug))
         handlers.append(SocialHandler(self))
+        handlers.append(CaptchaHandler(self))
 
-        if self.config.websocket_server_url:
-            if self.config.websocket_start_embedded_server:
-                self.sio_runner = SocketIoRunner(self.config.websocket_server_url)
-                self.sio_runner.start_listening_async()
+        #if self.config.websocket_server_url:
+        #    if self.config.websocket_start_embedded_server:
+        #        self.sio_runner = SocketIoRunner(self.config.websocket_server_url)
+        #        self.sio_runner.start_listening_async()
+        #
+        #    websocket_handler = SocketIoHandler(
+        #        self,
+        #        self.config.websocket_server_url
+        #    )
+        #    handlers.append(websocket_handler)
 
-            websocket_handler = SocketIoHandler(
-                self,
-                self.config.websocket_server_url
-            )
-            handlers.append(websocket_handler)
-
-            if self.config.websocket_remote_control:
-                remote_control = WebsocketRemoteControl(self).start()
+        #    if self.config.websocket_remote_control:
+        #        remote_control = WebsocketRemoteControl(self).start()
 
         # @var EventManager
         self.event_manager = EventManager(self.config.walker_limit_output, *handlers)
@@ -464,6 +466,20 @@ class PokemonGoBot(object):
         self.event_manager.register_event('pokemon_inventory_full')
         self.event_manager.register_event(
             'pokemon_caught',
+            parameters=(
+                'pokemon',
+                'ncp', 'cp', 'iv', 'iv_display', 'exp',
+                'stardust',
+                'encounter_id',
+                'latitude',
+                'longitude',
+                'pokemon_id',
+                'daily_catch_limit',
+                'caught_last_24_hour',
+            )
+        )
+        self.event_manager.register_event(
+            'pokemon_vip_caught',
             parameters=(
                 'pokemon',
                 'ncp', 'cp', 'iv', 'iv_display', 'exp',
@@ -817,36 +833,36 @@ class PokemonGoBot(object):
             location = self.position[0:2]
             cells = self.find_close_cells(*location)
 
-        user_data_cells = os.path.join(_base_dir, 'data', 'cells-%s.json' % self.config.username)
-        try:
-            with open(user_data_cells, 'w') as outfile:
-                json.dump(cells, outfile)
-        except IOError as e:
-            self.logger.info('[x] Error while opening location file: %s' % e)
+        #user_data_cells = os.path.join(_base_dir, 'data', 'cells-%s.json' % self.config.username)
+        #try:
+        #    with open(user_data_cells, 'w') as outfile:
+        #        json.dump(cells, outfile)
+        #except IOError as e:
+        #    self.logger.info('[x] Error while opening location file: %s' % e)
 
-        user_web_location = os.path.join(
-            _base_dir, 'web', 'location-%s.json' % self.config.username
-        )
+        #user_web_location = os.path.join(
+        #    _base_dir, 'web', 'location-%s.json' % self.config.username
+        #)
         # alt is unused atm but makes using *location easier
-        try:
-            with open(user_web_location, 'w') as outfile:
-                json.dump({
-                    'lat': lat,
-                    'lng': lng,
-                    'alt': alt,
-                    'cells': cells
-                }, outfile)
-        except IOError as e:
-            self.logger.info('[x] Error while opening location file: %s' % e)
+        #try:
+        #    with open(user_web_location, 'w') as outfile:
+        #        json.dump({
+        #            'lat': lat,
+        #            'lng': lng,
+        #            'alt': alt,
+        #            'cells': cells
+        #        }, outfile)
+        #except IOError as e:
+        #    self.logger.info('[x] Error while opening location file: %s' % e)
 
-        user_data_lastlocation = os.path.join(
-            _base_dir, 'data', 'last-location-%s.json' % self.config.username
-        )
-        try:
-            with open(user_data_lastlocation, 'w') as outfile:
-                json.dump({'lat': lat, 'lng': lng, 'alt': alt, 'start_position': self.start_position}, outfile)
-        except IOError as e:
-            self.logger.info('[x] Error while opening location file: %s' % e)
+        #user_data_lastlocation = os.path.join(
+        #    _base_dir, 'data', 'last-location-%s.json' % self.config.username
+        #)
+        #try:
+        #    with open(user_data_lastlocation, 'w') as outfile:
+        #        json.dump({'lat': lat, 'lng': lng, 'alt': alt, 'start_position': self.start_position}, outfile)
+        #except IOError as e:
+        #    self.logger.info('[x] Error while opening location file: %s' % e)
     def emit_forts_event(self,response_dict):
         map_objects = response_dict.get(
             'responses', {}
@@ -857,16 +873,16 @@ class PokemonGoBot(object):
         if status and status == 1:
             map_cells = map_objects['map_cells']
 
-            if map_cells and len(map_cells):
-                for cell in map_cells:
-                    if "forts" in cell and len(cell["forts"]):
-                        self.event_manager.emit(
-                            'forts_found',
-                            sender=self,
-                            level='debug',
-                            formatted='Found forts {json}',
-                            data={'json': json.dumps(cell["forts"])}
-                        )
+            #if map_cells and len(map_cells):
+                #for cell in map_cells:
+                    #if "forts" in cell and len(cell["forts"]):
+                        #self.event_manager.emit(
+                        #    'forts_found',
+                        #    sender=self,
+                        #    level='debug',
+                        #    formatted='Found forts {json}',
+                        #    data={'json': json.dumps(cell["forts"])}
+                        #)
 
     def find_close_cells(self, lat, lng):
         cellid = get_cell_ids(lat, lng)
@@ -910,7 +926,6 @@ class PokemonGoBot(object):
                 self.api = ApiWrapper(config=self.config)
                 self.api.set_position(*position)
                 self.login()
-                self.api.activate_signature(self.get_encryption_lib())
 
     def login(self):
         self.event_manager.emit(
@@ -964,12 +979,13 @@ class PokemonGoBot(object):
         if _platform == "Windows" or _platform == "win32":
             # Check if we are on 32 or 64 bit
             if sys.maxsize > 2**32:
-                file_name = 'encrypt_64.dll'
+                file_name = 'src/pgoapi/pgoapi/lib/encrypt64.dll'
             else:
-                file_name = 'encrypt.dll'
-        else:
-            file_name = 'encrypt.so'
-
+                file_name = 'src/pgoapi/pgoapi/lib/encrypt32.dll'
+        if _platform.lower() == "darwin":
+            file_name= 'src/pgoapi/pgoapi/lib/libencrypt-osx-64.so'
+        if _platform.lower() == "linux" or _platform.lower() == "linux2":
+            file_name = 'src/pgoapi/pgoapi/lib/libencrypt-linux-x86-64.so'
         if self.config.encrypt_location == '':
             path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
         else:
@@ -978,6 +994,32 @@ class PokemonGoBot(object):
         full_path = path + '/'+ file_name
         if not os.path.isfile(full_path):
             self.logger.error(file_name + ' is not found! Please place it in the bots root directory or set encrypt_location in config.')
+            self.logger.info('Platform: '+ _platform + ' ' + file_name + ' directory: '+ path)
+            sys.exit(1)
+        else:
+            self.logger.info('Found '+ file_name +'! Platform: ' + _platform + ' ' + file_name + ' directory: ' + path)
+
+        return full_path
+
+    def get_hash_lib(self):
+        if _platform == "Windows" or _platform == "win32":
+            # Check if we are on 32 or 64 bit
+            if sys.maxsize > 2**32:
+                file_name = 'src/pgoapi/pgoapi/lib/niantichash64.dll'
+            else:
+                file_name = 'src/pgoapi/pgoapi/lib/niantichash32.dll'
+        if _platform.lower() == "darwin":
+            file_name= 'src/pgoapi/pgoapi/lib/libniantichash-osx-64.so'
+        if _platform.lower() == "linux" or _platform.lower() == "linux2":
+            file_name = 'src/pgoapi/pgoapi/lib/libniantichash-linux-x86-64.so'
+        if self.config.encrypt_location == '':
+            path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        else:
+            path = self.config.encrypt_location
+
+        full_path = path + '/'+ file_name
+        if not os.path.isfile(full_path):
+            self.logger.error(file_name + ' is not found! Please place it in the bots root directory')
             self.logger.info('Platform: '+ _platform + ' ' + file_name + ' directory: '+ path)
             sys.exit(1)
         else:
@@ -995,7 +1037,9 @@ class PokemonGoBot(object):
         self.login()
         # chain subrequests (methods) into one RPC call
 
-        self.api.activate_signature(self.get_encryption_lib())
+        #self.api.set_signature_lib(self.get_encryption_lib())
+        #self.api.set_hash_lib(self.get_hash_lib())
+
         self.logger.info('')
         # send empty map_cells and then our position
         self.update_web_location()

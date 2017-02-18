@@ -44,7 +44,7 @@ from logging import Formatter
 codecs.register(lambda name: codecs.lookup("utf-8") if name == "cp65001" else None)
 
 from getpass import getpass
-from pgoapi.exceptions import NotLoggedInException, ServerSideRequestThrottlingException, ServerBusyOrOfflineException, NoPlayerPositionSetException
+from pgoapi.exceptions import NotLoggedInException, ServerSideRequestThrottlingException, ServerBusyOrOfflineException, NoPlayerPositionSetException, AuthException
 from geopy.exc import GeocoderQuotaExceeded
 
 from pokemongo_bot import PokemonGoBot, TreeConfigBuilder
@@ -251,7 +251,9 @@ def main():
                     level='info',
                     formatted='Probably permabanned, Game Over ! Play again at https://club.pokemon.com/us/pokemon-trainer-club/sign-up/'
                 )
-                time.sleep(36000)
+                with open('..\\cemetery\\accounts.csv', 'a') as rip:
+                    rip.write(config.username+"\n")
+                input("I'm sorry, close this sheit and remove it from the accounts list...")
             except NoPlayerPositionSetException:
                 bot.event_manager.emit(
                     'api_error',
@@ -259,7 +261,19 @@ def main():
                     level='info',
                     formatted='No player position set'
                 )
-                time.sleep(wait_time)
+                with open('..\\cemetery\\accounts.csv', 'a') as rip:
+                    rip.write(config.username+"\n")
+                input("Sheit mang")
+            except AuthException:
+                bot.event_manager.emit(
+                    'api_error',
+                    sender=bot,
+                    level='info',
+                    formatted='Wrong credentianls yo...'
+                )
+                with open('..\\cemetery\\accounts.csv', 'a') as rip:
+                    rip.write(config.username+"\n")
+                input("Sheit mang get your shit together")
 
     except GeocoderQuotaExceeded:
         raise Exception("Google Maps API key over requests limit.")
@@ -279,30 +293,29 @@ def main():
             report_summary(bot)
 
         raise
-    finally:
         # Cache here on SIGTERM, or Exception.  Check data is available and worth caching.
-        if bot:
-            if len(bot.recent_forts) > 0 and bot.recent_forts[-1] is not None and bot.config.forts_cache_recent_forts:
-                cached_forts_path = os.path.join(
-                    _base_dir, 'data', 'recent-forts-%s.json' % bot.config.username
-                )
-                try:
-                    with open(cached_forts_path, 'w') as outfile:
-                        json.dump(bot.recent_forts, outfile)
-                    bot.event_manager.emit(
-                        'cached_fort',
-                        sender=bot,
-                        level='debug',
-                        formatted='Forts cached.'
-                    )
-                except IOError as e:
-                    bot.event_manager.emit(
-                        'error_caching_forts',
-                        sender=bot,
-                        level='debug',
-                        formatted='Error caching forts for {path}',
-                        data={'path': cached_forts_path}
-                        )
+        #if bot:
+        #    if len(bot.recent_forts) > 0 and bot.recent_forts[-1] is not None and bot.config.forts_cache_recent_forts:
+        #        cached_forts_path = os.path.join(
+        #            _base_dir, 'data', 'recent-forts-%s.json' % bot.config.username
+        #        )
+        #        try:
+        #            with open(cached_forts_path, 'w') as outfile:
+        #                json.dump(bot.recent_forts, outfile)
+        #            bot.event_manager.emit(
+        #                'cached_fort',
+        #                sender=bot,
+        #                level='debug',
+        #                formatted='Forts cached.'
+        #            )
+        #        except IOError as e:
+        #            bot.event_manager.emit(
+        #                'error_caching_forts',
+        #                sender=bot,
+        #                level='debug',
+        #                formatted='Error caching forts for {path}',
+        #                data={'path': cached_forts_path}
+        #                )
 
 
 def check_mod(config_file):
@@ -696,7 +709,6 @@ def init_config():
          type=bool,
          default=True
     )
-
     add_config(
          parser,
          load,
@@ -705,6 +717,24 @@ def init_config():
          type=bool,
          default=False
     )
+    add_config(
+        parser,
+        load,
+        short_flag="-prxip",
+        long_flag="--proxy_ip",
+        help="Proxy (https and http)",
+        type=str,
+        default=None
+    )
+    add_config(
+        parser,
+        load,
+        short_flag="-prxp",
+        long_flag="--proxy_port",
+        help="Proxy port",
+        type=int,
+        default=None
+    )
 
     # Start to parse other attrs
     config = parser.parse_args()
@@ -712,6 +742,8 @@ def init_config():
         config.username = raw_input("Username: ")
     if not config.password and 'password' not in load:
         config.password = getpass("Password: ")
+    
+    setup_proxy(config)
 
     config.favorite_locations = load.get('favorite_locations', [])
     config.encrypt_location = load.get('encrypt_location', '')
@@ -727,7 +759,6 @@ def init_config():
     config.live_config_update_enabled = config.live_config_update.get('enabled', False)
     config.live_config_update_tasks_only = config.live_config_update.get('tasks_only', False)
     config.logging = load.get('logging', {})
-
     if config.map_object_cache_time < 0.0:
         parser.error("--map_object_cache_time is out of range! (should be >= 0.0)")
         return None
@@ -800,6 +831,14 @@ def init_config():
 
     fix_nested_config(config)
     return config, config_file
+
+def setup_proxy(config):
+    if config.proxy_ip and len(config.proxy_ip)>0 and config.proxy_ip.count('.') == 3 and  all(0<=int(num)<256 for num in config.proxy_ip.rstrip().split('.')):
+        if config.proxy_port and int(config.proxy_port )<65536 and  int(config.proxy_port )>1:
+            print "PROXY IP: " + config.proxy_ip
+            os.environ['http_proxy']="http://"+config.proxy_ip+":"+str(config.proxy_port)+"/"
+            os.environ['https_proxy']="http://"+config.proxy_ip+":"+str(config.proxy_port)+"/"
+            os.environ['no_proxy']= "127.0.0.1,localhost"
 
 
 def add_config(parser, json_config, short_flag=None, long_flag=None, **kwargs):
